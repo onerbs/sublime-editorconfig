@@ -1,0 +1,46 @@
+%YAML 1.2
+---
+name: INI
+file_extensions:
+  - ini
+scope: source.ini
+variables:
+  re_numeric: '\b-?[0-9]+(\.[\d]+)?\b'
+contexts:
+  main:
+    - match: '\['
+      scope: punctuation.definition.section.ini
+      push:
+        - meta_scope: entity.section.ini
+        - match: ']'
+          scope: punctuation.definition.section.ini
+          pop: true
+    - match: '"'
+      scope: punctuation.definition.string.begin.ini
+      push:
+        - meta_scope: string.quoted.double.ini
+        - match: '\\.'
+          scope: constant.character.escape.ini
+        - match: '"'
+          scope: punctuation.definition.string.end.ini
+          pop: true
+    - match: ';|#'
+      scope: punctuation.definition.comment.ini
+      push:
+        - meta_scope: comment.line.ini
+        - include: EOL
+    - match: '='
+      scope: keyword.operator.assignment.ini
+      push:
+        - match: '\b(true|false)\b'
+          scope: constant.language.boolean.ini
+        - match: '{{re_numeric}}'
+          scope: constant.numeric.ini
+        - match: '\w+({{re_numeric}})?'
+          scope: string.name.value.ini
+        - include: EOL
+    - match: \w+
+      scope: entity.name.tag.ini
+  EOL:
+    - match: $
+      pop: true
