@@ -23,41 +23,51 @@ CHARSETS = {
 	'utf-8': 'UTF-8',
 }
 
-DEBUG = True
+LOAD = 'load'
+SAVE = 'save'
 
 
-def debug(x: str):
-	if DEBUG:
-		print('EditorConfig: ' + x)
+class Config():
+	# TODO use st config
+	debug = False
+	watch = [LOAD, SAVE]
+	# on_load = []
+	# on_save = []
+
+
+def debug(message: str, tag='EditorConfig'):
+	if Config.debug:
+		tag = tag + ': ' if tag else ''
+		print(tag + message)
 
 
 class EditorConfig(EventListener):
-	def on_load(self, view: View):
-		dispatch(view, '_load_')
-
 	def on_activated(self, view: View):
-		dispatch(view, '_start_')
+		dispatch(view, LOAD)
 
 	def on_pre_save(self, view: View):
-		dispatch(view, '_save_')
+		dispatch(view, SAVE)
 
 
 def dispatch(view: View, event: str):
-	parts = path.split(view.file_name())
-	config = parse_file(find_file(parts[0]), parts[1].split('.')[-1])
+	file_name = view.file_name()
+	if file_name and event in Config.watch:
+		parts = path.split(file_name)
+		debug('---- ' + event + ' ' + parts[1] + ' ----', tag=None)
+		config = parse_file(walk(parts[0]), parts[1].split('.')[-1])
 
-	if event == '_start_' or event == '_load_':
-		fix_eol(view, config.get('end_of_line'))
-		fix_charset(view, config.get('charset'))
+		if event == LOAD:
+			# fix_charset(view, config.get('charset'))
+			fix_eol(view, config.get('end_of_line'))
+			fix_indent(view, config.get('indent_style'), int(config.get('indent_size', '0')))
 
-	if event == '_save_':
-		fix_indent(view, config.get('indent_style'))
-		fix_newline(view, config.get('insert_final_newline'))
+		if event == SAVE:
+			fix_newline(view, config.get('insert_final_newline'))
 
 
 class RemoveFinalNewlinesCommand(TextCommand):
 	def run(self, edit):
-		region = self.view.find('\n*\0', 0)
+		region = self.view.find('\n*\Z', 0)
 		if region.size() > 1:
 			self.view.erase(edit, region)
 			debug('Remove final newlines')
@@ -65,16 +75,15 @@ class RemoveFinalNewlinesCommand(TextCommand):
 
 class NormalizeFinalNewlinesCommand(TextCommand):
 	def run(self, edit):
-		region = self.view.find('\n*\0', 0)
+		region = self.view.find('\n*\Z', 0)
 		if region.size() > 1:
 			self.view.replace(edit, region, '\n')
 			debug('Normalize final newlines')
 
-
 # ---------------------------------------------------------------------------- #
 
 
-def fix_charset(view: View, charset: str):
+def fix_charset (view: View, charset: str):
 	encoding = view.encoding()
 	if (
 		encoding != 'Undefined' and
@@ -92,14 +101,23 @@ def fix_eol(view: View, eol: str):
 		debug('Updated EOL')
 
 
-def fix_indent(view: View, indent_style: str):
-	spaces = view.settings().get('translate_tabs_to_spaces')
-	if indent_style == 'space' and spaces is False:
-		view.run_command('expand_tabs', {'set_translate_tabs': True})
-		debug('Update Using spaces')
-	elif indent_style == 'tab' and spaces is True:
-		view.run_command('unexpand_tabs', {'set_translate_tabs': True})
-		debug('Update Using tabs')
+def fix_indent(view: View, indent_style: str, indent_size: int):
+	if view.find('^\t', 0).size() > 0:
+		# view using tabs
+		if indent_style == 'space':
+			view.run_command('expand_tabs', {'set_translate_tabs': True})
+			debug('Using spaces')
+	else:
+		tab_size = indent_size if indent_size > 0 else view.settings().get('tab_size')
+		spaces_pattern = '^ {' + str(tab_size) + '}'
+		if view.find(spaces_pattern, 0).size() > 0:
+			# view using spaces
+			if indent_style == 'tab':
+				view.run_command('unexpand_tabs', {'set_translate_tabs': True})
+				debug('Using tabs')
+		else:
+			# view without indentation
+			pass
 
 
 def fix_newline(view: View, insert_final_newline: str):
@@ -113,11 +131,12 @@ def fix_newline(view: View, insert_final_newline: str):
 # ---------------------------------------------------------------------------- #
 
 
-def find_file(root: str) -> str:
+def walk(root: str) -> str:
 	file = path.join(root, '.editorconfig')
 	if not path.exists(file):
 		parent = path.split(root)[0]
-		return '' if parent == root else find_file(parent)
+		file = '' if parent == root else walk(parent)
+	debug('found: ' + file)
 	return file
 
 
@@ -126,7 +145,7 @@ def parse_file(file: str, extension: str) -> dict:
 	if file:
 		applicable = False
 		for line in get_lines(file):
-			if line[0] == '[':
+			if line.startswith('['):
 				applicable = matches(line[1:-1], extension)
 				continue
 			if not applicable:
@@ -134,7 +153,24 @@ def parse_file(file: str, extension: str) -> dict:
 			if '=' in line:
 				option, value = split(' *= *', line, 1)
 				options[option] = value
+	# if Config.debug:
+	#   for key in options.keys():
+	#       val = options[key]
+	#       times = 7 - len(val)
+	#       print('  ' + val + repeat(' ', times) + key)
 	return options
+
+
+# def repeat(s: str, t: int) -> str:
+#   if t <= 0:
+#       return ''
+#   if t == 1:
+#       return s
+#   else:
+#       r = s
+#       for _ in range(1, t):
+#           r += s
+#       return r
 
 
 def get_lines(file: str) -> list:
@@ -142,22 +178,26 @@ def get_lines(file: str) -> list:
 	for line in open(file).readlines():
 		if line.strip():
 			lines.append(split('[#;]', line)[0].strip().lower())
+	# if Config.debug:
+	#   for line in lines:
+	#       print(line)
 	return lines
 
 
 def matches(pattern: str, extension: str) -> bool:
 	pattern = clean_pattern(pattern)
 	for part in pattern.split(','):
-		if part is '*' or part is extension:
+		if part == '*' or part == extension:
 			return True
 	return False
 
 
 def clean_pattern(pattern: str) -> str:
+	result = ''
 	if pattern is '*':
-		return pattern
-	clean = ''
+		pattern, result = result, pattern
 	for char in pattern:
 		if match('[a-z,-]', char):
-			clean += char
-	return clean
+			result += char
+	# debug('pattern: ' + result)
+	return result
