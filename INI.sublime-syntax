@@ -24,11 +24,7 @@ contexts:
         - match: '"'
           scope: punctuation.definition.string.end.ini
           pop: true
-    - match: ';|#'
-      scope: punctuation.definition.comment.ini
-      push:
-        - meta_scope: comment.line.ini
-        - include: EOL
+    - include: Comment
     - match: '='
       scope: keyword.operator.assignment.ini
       push:
@@ -38,9 +34,16 @@ contexts:
           scope: constant.numeric.ini
         - match: '\w+({{re_numeric}})?'
           scope: string.name.value.ini
+        - include: Comment
         - include: EOL
     - match: \w+
       scope: entity.name.tag.ini
+  Comment:
+    - match: ';|#'
+      scope: punctuation.definition.comment.ini
+      push:
+        - meta_scope: comment.line.ini
+        - include: EOL
   EOL:
     - match: $
       pop: true
