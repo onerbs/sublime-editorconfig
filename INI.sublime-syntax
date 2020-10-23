@@ -1,49 +1,51 @@
 %YAML 1.2
 ---
 name: INI
+scope: source.ini
 file_extensions:
   - ini
-scope: source.ini
+
 variables:
-  re_numeric: '\b-?[0-9]+(\.[\d]+)?\b'
+  re_numeric: '\b-?[\d]+(\.[\d]+)?\b'
+
 contexts:
   main:
-    - match: '\['
-      scope: punctuation.definition.section.ini
-      push:
-        - meta_scope: entity.section.ini
-        - match: ']'
-          scope: punctuation.definition.section.ini
-          pop: true
-    - match: '"'
-      scope: punctuation.definition.string.begin.ini
-      push:
-        - meta_scope: string.quoted.double.ini
-        - match: '\\.'
-          scope: constant.character.escape.ini
-        - match: '"'
-          scope: punctuation.definition.string.end.ini
-          pop: true
     - include: Comment
+    - include: Section
     - match: '='
       scope: keyword.operator.assignment.ini
       push:
+        - match: \\['"0abtrn;#=:]
+          scope: constant.character.escaped.ini
+        - match: \\x\h+
+          scope: constant.character.unicode.ini
         - match: '\b(true|false)\b'
           scope: constant.language.boolean.ini
         - match: '{{re_numeric}}'
           scope: constant.numeric.ini
-        - match: '\w+({{re_numeric}})?'
+        - match: \S+
           scope: string.name.value.ini
         - include: Comment
         - include: EOL
-    - match: \w+
-      scope: entity.name.tag.ini
+    - match: \S+
+      scope: variable.other.ini
+
   Comment:
     - match: ';|#'
       scope: punctuation.definition.comment.ini
       push:
         - meta_scope: comment.line.ini
         - include: EOL
+
+  Section:
+    - match: \[
+      scope: punctuation.definition.section.begin.ini
+      push:
+        - meta_scope: entity.section.ini
+        - match: \]
+          scope: punctuation.definition.section.end.ini
+          pop: true
+
   EOL:
     - match: $
       pop: true
