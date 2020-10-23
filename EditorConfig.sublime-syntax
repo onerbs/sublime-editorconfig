@@ -1,9 +1,12 @@
 %YAML 1.2
 ---
 name: EditorConfig
+scope: source.ini.editorconfig
 file_extensions:
   - .editorconfig
-scope: source.ini.editorconfig
+
 contexts:
   main:
+    - match: \b(root|charset|end_of_line|indent_size|(indent|quote)_style|insert_final_newline|trim_trailing_whitespace|tab_width)\b
+      scope: keyword.language.editorconfig
     - include: scope:source.ini
