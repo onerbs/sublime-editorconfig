@@ -1,0 +1,29 @@
+{
+  "scope": "source.ini.editorconfig",
+  "completions": [
+    "root",
+    "charset",
+    "end_of_line",
+    "indent_size",
+    "indent_style",
+    "quote_style",
+    "insert_final_newline",
+    "trim_trailing_whitespace",
+    "tab_width",
+
+    "cr",
+    "crlf",
+    "double",
+    "false",
+    "latin1",
+    "lf",
+    "single",
+    "space",
+    "tab",
+    "true",
+    "utf-16be",
+    "utf-16le",
+    "utf-8",
+    "utf-8-bom",
+  ]
+}
