@@ -9,4 +9,7 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 [*.py]
+indent_size = 4
+
+[*.sublime-snippet]
 indent_style = tab
