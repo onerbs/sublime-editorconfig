@@ -1,0 +1,17 @@
+{
+  "debug": true,
+  "verbose": false,
+
+  // Valid events are:
+  //  - "load"
+  //  - "save"
+  "watch": ["load", "save"],
+
+  // Valid options are:
+  //  - "encoding":
+  //  - "eol":
+  //  - "final_newline":
+  //  - "indent":
+  "on_load": ["indent"],
+  "on_save": ["final_newline", "eol"],
+}
