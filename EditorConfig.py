@@ -226,7 +226,7 @@ def lookup(root_dir: str) -> str:
         return ""
     file_path = path.join(parent, ".editorconfig")
     if path.exists(file_path):
-        debug("found: " + file_path)
+        debug("using " + file_path)
         return file_path
     return lookup(parent)
 
