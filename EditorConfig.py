@@ -185,29 +185,29 @@ class Fixes:
 def parse_file(absolute_path: str) -> dict:
     """Very basic INI parser."""
 
+    # todo: read from sublime settings
+    options = {
+        'indent_size': 2
+    }
     config_file = lookup(absolute_path)
     if not config_file:
-        debug("Loading defaults")
-        # todo: load deafults.
-    current_file = path.split(absolute_path)[1]
-    ext = current_file.split(".")[-1]
-    options = {}
-    if config_file:
-        applicable = False
-        for line in get_lines(config_file):
-            if line.startswith("["):
-                applicable = matches(ext, line[1:-1])
-                continue
-            if not applicable:
-                continue
-            if "=" in line:
-                option, value = re.split(r"\s*=\s*", line, 1)
-                options[option] = value
+        return options
+    extension = path.split(absolute_path)[1].split(".")[-1]
+    applicable = False
+    for line in get_lines(config_file):
+        if line.startswith("["):
+            applicable = matches(extension, line[1:-1])
+            continue
+        if not applicable:
+            continue
+        if "=" in line:
+            option, value = re.split(r"\s*=\s*", line, 1)
+            options[option] = value
     if config.verbose:
-        for key in options.keys():
-            val = options[key]
-            times = 7 - len(val)
-            print("  %s%s%s" % (val, " " * times, key))
+        times = max(len(it) for it in options.keys()) + 2
+        for key, val in options.items():
+            spaces = " " * (times - len(key))
+            print("  %s%s%s" % (key, spaces, val))
     return options
 
 
