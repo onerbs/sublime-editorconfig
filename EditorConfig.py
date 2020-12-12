@@ -92,14 +92,8 @@ def dispatch(view: View, event: str):
     if event in config.watch:
         debug("---- %s %s ----" % (event, file_name), tag=None)
         fixes = Fixes(view, parse_file(file_name))
-        table = {
-            "encoding":      fixes.encoding,
-            "eol":           fixes.eol,
-            "final_newline": fixes.final_newline,
-            "indent":        fixes.indent,
-        }
         for fix in config["on_" + event]:
-            table[fix]()
+            fixes.table[fix]()
 
 
 class RemoveFinalNewlinesCommand(TextCommand):
@@ -125,6 +119,12 @@ class Fixes:
     def __init__(self, view, settings):
         self.view = view
         self.settings = settings
+        self.table = {
+            "encoding":      self.encoding,
+            "eol":           self.eol,
+            "final_newline": self.final_newline,
+            "indent":        self.indent,
+        }
 
     def encoding(self):
         # encoding = config.get("encoding")
