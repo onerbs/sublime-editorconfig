@@ -4,7 +4,7 @@
 # | |__| (_| | | || (_) | |  | |__| (_) | | | |  _| | (_| |
 # |_____\__,_|_|\__\___/|_|   \____\___/|_| |_|_| |_|\__, |
 #                                                    |___/
-from sublime import View, load_settings
+from sublime import View, Settings, load_settings, platform
 from sublime_plugin import EventListener, TextCommand
 from os import path
 import re
@@ -91,7 +91,9 @@ def dispatch(view: View, event: str):
 
     if event in config.watch:
         debug("---- %s %s ----" % (event, file_name), tag=None)
-        fixes = Fixes(view, parse_file(file_name))
+        default_settings = get_default_settings(view.settings())
+        settings = parse_file(file_name, default_settings)
+        fixes = Fixes(view, settings)
         for fix in config["on_" + event]:
             fixes.table[fix]()
 
@@ -181,18 +183,35 @@ class Fixes:
 
 # -----------------------------------------------------------------------------
 
+def get_default_settings(settings: Settings) -> dict:
+    """
+    Read the default settings from the sublime settings.
+    """
+    charset = settings.get("default_encoding").lower()
+    end_of_line = "crlf" if platform() == "windows" else "lf"
+    indent_size = settings.get("tab_size")
+    indent_style = "space" if settings.get("translate_tabs_to_spaces") else "tab"
+    insert_final_newline = settings.get("ensure_newline_at_eof_on_save")
+    trim_trailing_whitespace = settings.get("trim_trailing_white_space_on_save")
 
-def parse_file(absolute_path: str) -> dict:
+    default_settings = {
+        "charset": charset,
+        "end_of_line": end_of_line,
+        "indent_size": indent_size,
+        "indent_style": indent_style,
+        "insert_final_newline": insert_final_newline,
+        "trim_trailing_whitespace": trim_trailing_whitespace,
+    }
+    return default_settings
+
+
+def parse_file(absolute_path: str, default_settings: dict) -> dict:
     """
     Basic INI parser.
     """
-    # todo: read from sublime settings
-    options = {
-        'indent_size': 2
-    }
     config_file = lookup(absolute_path)
     if not config_file:
-        return options
+        return default_settings
     extension = path.split(absolute_path)[1].split(".")[-1]
     applicable = False
     for line in get_lines(config_file):
@@ -203,13 +222,13 @@ def parse_file(absolute_path: str) -> dict:
             continue
         if "=" in line:
             option, value = re.split(r"\s*=\s*", line, 1)
-            options[option] = value
+            default_settings[option] = value
     if config.verbose:
-        times = max(len(it) for it in options.keys()) + 2
-        for key, val in options.items():
+        times = max(len(it) for it in default_settings.keys()) + 2
+        for key, val in default_settings.items():
             spaces = " " * (times - len(key))
             print("  %s%s%s" % (key, spaces, val))
-    return options
+    return default_settings
 
 
 def lookup(root_dir: str) -> str:
