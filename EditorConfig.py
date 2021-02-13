@@ -118,7 +118,7 @@ class NormalizeFinalNewlinesCommand(TextCommand):
 
 
 class Fixes:
-    def __init__(self, view, settings):
+    def __init__(self, view: View, settings: dict):
         self.view = view
         self.settings = settings
         self.table = {
@@ -142,11 +142,11 @@ class Fixes:
         debug('TODO implement encoding fix')
 
     def eol(self):
-        eol = self.settings.get("end_of_line")
-        curr_eol = self.view.line_endings().lower()
-        if eol in LINE_ENDINGS and LINE_ENDINGS[eol] != curr_eol:
-            self.view.set_line_endings(LINE_ENDINGS[eol])
-            debug("Updated EOL")
+        target = self.settings.get("end_of_line")
+        current = self.view.line_endings().lower()
+        if target in LINE_ENDINGS and LINE_ENDINGS[target] != current:
+            self.view.set_line_endings(LINE_ENDINGS[target])
+            debug("Fixed EOL")
 
     def final_newline(self):
         insert_fnl = self.settings.get("insert_final_newline")
@@ -251,17 +251,16 @@ def lookup(root_dir: str) -> str:
     return lookup(parent)
 
 
-def get_lines(filename: str) -> list:
+def get_lines(file_name: str) -> list:
     """
     Ignore empty lines and comments, output in lowercase.
     """
     lines = []
-    with open(filename) as file:
-        for line in file.readlines():
-            ln = re.split("[#;]", line)[0].strip().lower()
-            if ln:
-                lines.append(ln)
-                verbose(ln)
+    for ln in open(file_name).readlines():
+        line = re.split("[#;]", ln)[0].strip().lower()
+        if line:
+            verbose(line)
+            lines.append(line)
     return lines
 
 
