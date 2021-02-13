@@ -183,8 +183,9 @@ class Fixes:
 
 
 def parse_file(absolute_path: str) -> dict:
-    """Very basic INI parser."""
-
+    """
+    Basic INI parser.
+    """
     # todo: read from sublime settings
     options = {
         'indent_size': 2
@@ -213,10 +214,10 @@ def parse_file(absolute_path: str) -> dict:
 
 def lookup(root_dir: str) -> str:
     """
-    Look for the .editorconfig file from the provided directory.
+    Look for the .editorconfig file in the root_dir.
 
-    If the file is not in the provided path, then lookup in the
-    parent of the provided directory.
+    If the file is not found, then lookup in the parent
+    directory recursively until reach the root directory.
 
     :return: The path to the file if found, else an empty string.
     """
@@ -232,7 +233,9 @@ def lookup(root_dir: str) -> str:
 
 
 def get_lines(filename: str) -> list:
-    """Ignore empty lines and comments and transform lo lowercase."""
+    """
+    Ignore empty lines and comments, output in lowercase.
+    """
     lines = []
     with open(filename) as file:
         for line in file.readlines():
@@ -244,7 +247,9 @@ def get_lines(filename: str) -> list:
 
 
 def matches(string: str, _pattern: str) -> bool:
-    """Check whether a string matches a pattern or not"""
+    """
+    Check whether a string matches a pattern or not.
+    """
     for pattern in extract_patterns(_pattern):
         if pattern == "*" or pattern == string:
             return True
