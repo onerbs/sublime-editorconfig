@@ -36,8 +36,8 @@ class Holder:
         return getattr(self, key)
 
     def __str__(self):
-        data = '\n'.join('  %s: %s' % (k, self[k]) for k in self._props)
-        return '{\n%s\n}' % data
+        data = "\n".join("  %s: %s" % (k, self[k]) for k in self._props)
+        return "{\n%s\n}" % data
 
 
 class Config:
@@ -45,11 +45,11 @@ class Config:
         self._holder = Holder()
         for key, fallback in [
             # Default configuration
-            ('debug',   False),
-            ('verbose', False),
-            ('watch',   []),
-            ('on_load', []),
-            ('on_save', []),
+            ("debug",   False),
+            ("verbose", False),
+            ("watch",   []),
+            ("on_load", []),
+            ("on_save", []),
         ]:
             self._holder[key] = raw.get(key) or fallback
 
