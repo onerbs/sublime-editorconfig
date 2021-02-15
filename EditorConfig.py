@@ -257,7 +257,7 @@ def get_lines(file_name: str) -> list:
     """
     lines = []
     for ln in open(file_name).readlines():
-        line = re.split("[#;]", ln)[0].strip().lower()
+        line = re.split("[#;]", ln)[0].strip()
         if line:
             verbose(line)
             lines.append(line)
