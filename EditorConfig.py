@@ -22,6 +22,8 @@ ENCODING = {
     "utf-8":    "UTF-8",
 }
 
+config = None
+
 
 class Holder:
     def __init__(self):
@@ -71,7 +73,8 @@ def verbose(msg, tag=" >> "):
     config.verbose and print("%s: %s" % (tag, msg) if tag else msg)
 
 
-config = Config(load_settings("EditorConfig.sublime-settings"))
+def get_config() -> Config:
+    return Config(load_settings("EditorConfig.sublime-settings"))
 
 
 # -----------------------------------------------------------------------------
@@ -86,6 +89,10 @@ class EditorConfig(EventListener):
 
 
 def dispatch(view: View, event: str):
+    global config
+    if not config:
+        config = get_config()
+
     file_name = view.file_name()
     if not file_name: return
 
