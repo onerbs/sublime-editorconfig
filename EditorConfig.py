@@ -43,7 +43,7 @@ class Holder:
 
 
 class Config:
-    def __init__(self, raw):
+    def __init__(self, raw: Settings):
         self._holder = Holder()
         for key, fallback in [
             # Default configuration
