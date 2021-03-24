@@ -4,7 +4,7 @@
 # | |__| (_| | | || (_) | |  | |__| (_) | | | |  _| | (_| |
 # |_____\__,_|_|\__\___/|_|   \____\___/|_| |_|_| |_|\__, |
 #                                                    |___/
-from sublime import View, Settings, load_settings, platform
+from sublime import View, Settings, load_settings
 from sublime_plugin import EventListener, TextCommand
 from os import path
 import re
@@ -22,59 +22,16 @@ ENCODING = {
     "utf-8":    "UTF-8",
 }
 
+settings = None
 config = None
 
 
-class Holder:
-    def __init__(self):
-        self._props = []
-
-    def __setitem__(self, key, value):
-        if key not in self._props:
-            self._props.append(key)
-        object.__setattr__(self, key, value)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __str__(self):
-        data = "\n".join("  %s: %s" % (k, self[k]) for k in self._props)
-        return "{\n%s\n}" % data
-
-
-class Config:
-    def __init__(self, raw: Settings):
-        self._holder = Holder()
-        for key, fallback in [
-            # Default configuration
-            ("debug",   False),
-            ("verbose", False),
-            ("watch",   []),
-            ("on_load", []),
-            ("on_save", []),
-        ]:
-            self._holder[key] = raw.get(key) or fallback
-
-    def __getattr__(self, key):
-        return self._holder[key]
-
-    def __getitem__(self, key):
-        return self._holder[key]
-
-    def __str__(self):
-        return str(self._holder)
-
-
 def debug(msg, tag="EditorConfig"):
-    config.debug and print("%s: %s" % (tag, msg) if tag else msg)
+    settings["debug"] and print("%s: %s" % (tag, msg) if tag else msg)
 
 
-def verbose(msg, tag=" >> "):
-    config.verbose and print("%s: %s" % (tag, msg) if tag else msg)
-
-
-def get_config() -> Config:
-    return Config(load_settings("EditorConfig.sublime-settings"))
+def verbose(msg: str):
+    settings["verbose"] and print("  %s" % msg)
 
 
 # -----------------------------------------------------------------------------
@@ -89,19 +46,14 @@ class EditorConfig(EventListener):
 
 
 def dispatch(view: View, event: str):
-    global config
-    if not config:
-        config = get_config()
+    file_path = view.file_name()
+    if not file_path: return
 
-    file_name = view.file_name()
-    if not file_name: return
-
-    if event in config.watch:
-        debug("---- %s %s ----" % (event, file_name), tag=None)
-        default_settings = get_default_settings(view.settings())
-        settings = parse_file(file_name, default_settings)
-        fixes = Fixes(view, settings)
-        for fix in config["on_" + event]:
+    settings = use_settings()
+    if event in settings["watch"]:
+        debug("---- %s %s ----" % (event, file_path), tag=None)
+        fixes = Fixes(view, file_path)
+        for fix in settings["on_" + event]:
             fixes.table[fix]()
 
 
@@ -125,9 +77,9 @@ class NormalizeFinalNewlinesCommand(TextCommand):
 
 
 class Fixes:
-    def __init__(self, view: View, settings: dict):
+    def __init__(self, view: View, file_path: str):
         self.view = view
-        self.settings = settings
+        self.config = parse_config(file_path)
         self.table = {
             "encoding":      self.encoding,
             "eol":           self.eol,
@@ -136,8 +88,8 @@ class Fixes:
         }
 
     def encoding(self):
-        # encoding = config.get("encoding")
-        # curr_encoding = self.view.encoding()
+        # encoding = config["encoding"]
+        # curr_encoding = self.v
         # if (
         #     encoding != "Undefined" and
         #     encoding in ENCODING and
@@ -149,93 +101,74 @@ class Fixes:
         debug('TODO implement encoding fix')
 
     def eol(self):
-        target = self.settings.get("end_of_line")
-        current = self.view.line_endings().lower()
-        if target in LINE_ENDINGS and LINE_ENDINGS[target] != current:
-            self.view.set_line_endings(LINE_ENDINGS[target])
-            debug("Fixed EOL")
+        end_of_line = self.config["end_of_line"]
+        line_endings = "crlf" if self.view.line_endings().lower() == "windows" else "lf"
+        if end_of_line != line_endings:
+            self.view.set_line_endings(LINE_ENDINGS[end_of_line])
+            debug("Using %s" % end_of_line)
 
     def final_newline(self):
-        insert_fnl = self.settings.get("insert_final_newline")
-        ensure_fnl = self.view.settings().get("ensure_newline_at_eof_on_save")
-        if insert_fnl == "true" or ensure_fnl:
+        if self.config["insert_final_newline"]:
             self.view.run_command("normalize_final_newlines")
         else:
             self.view.run_command("remove_final_newlines")
 
     def indent(self):
-        indent_style = self.settings.get("indent_style")
-        indent_size = int(self.settings.get("indent_size", "0"))
-        tab_size = self.view.settings().get("tab_size")
+        indent_style = self.config["indent_style"]
+        indent_size = self.config["indent_size"]
+        self.view.settings().set("tab_size", indent_size)
         if self.view.find("^\t", 0).size() > 0:
-            # view using tabs
-            if indent_size != tab_size:
-                self.view.settings().set("tab_size", indent_size)
+            # verbose("Detect: tab")
+            # self.view.settings().set("tab_size", indent_size)
+            # debug("Using tab size %s" % indent_size)
             if indent_style == "space":
                 self.view.run_command("expand_tabs", {"set_translate_tabs": True})
                 debug("Using spaces")
         else:
-            curr_tab_size = self.view.settings().get("tab_size")
-            tab_size = indent_size if indent_size > 0 else curr_tab_size
-            spaces_pattern = "^ {" + str(tab_size) + "}"
-            if self.view.find(spaces_pattern, 0).size() > 0:
-                # view using spaces
+            re_spaces = "^ {%s}" % indent_size
+            if self.view.find(re_spaces, 0).size() > 0:
+                # verbose("Detect: space")
                 if indent_style == "tab":
                     self.view.run_command("unexpand_tabs", {"set_translate_tabs": True})
                     debug("Using tabs")
             else:
-                # view without indentation
+                # verbose("No indentation detected")
                 pass
 
 
 # -----------------------------------------------------------------------------
 
-def get_default_settings(settings: Settings) -> dict:
-    """
-    Read the default settings from the sublime settings.
-    """
-    charset = settings.get("default_encoding").lower()
-    end_of_line = "crlf" if platform() == "windows" else "lf"
-    indent_size = settings.get("tab_size")
-    indent_style = "space" if settings.get("translate_tabs_to_spaces") else "tab"
-    insert_final_newline = settings.get("ensure_newline_at_eof_on_save")
-    trim_trailing_whitespace = settings.get("trim_trailing_white_space_on_save")
 
-    default_settings = {
-        "charset": charset,
-        "end_of_line": end_of_line,
-        "indent_size": indent_size,
-        "indent_style": indent_style,
-        "insert_final_newline": insert_final_newline,
-        "trim_trailing_whitespace": trim_trailing_whitespace,
-    }
-    return default_settings
-
-
-def parse_file(absolute_path: str, default_settings: dict) -> dict:
+def parse_config(file_path: str) -> dict:
     """
     Basic INI parser.
     """
-    config_file = lookup(absolute_path)
-    if not config_file:
-        return default_settings
-    extension = path.split(absolute_path)[1].split(".")[-1]
-    applicable = False
-    for line in get_lines(config_file):
+    config = use_config()
+    config_file = lookup(file_path)
+    if config_file is None:
+        return config
+    lines = get_lines(config_file)
+    extension = path.split(file_path)[1].split(".")[-1]
+    applies = False
+    for line in lines:
         if line.startswith("["):
-            applicable = matches(extension, line[1:-1])
-            continue
-        if not applicable:
-            continue
-        if "=" in line:
+            applies = matches(extension, line[1:-1])
+            # verbose("%s %s %s" %(extension, applies, line))
+        elif applies and "=" in line:
             option, value = re.split(r"\s*=\s*", line, 1)
-            default_settings[option] = value
-    if config.verbose:
-        times = max(len(it) for it in default_settings.keys()) + 2
-        for key, val in default_settings.items():
-            spaces = " " * (times - len(key))
-            print("  %s%s%s" % (key, spaces, val))
-    return default_settings
+            config[option] = parse_value(value)
+    return inspect('Parsed (%s)' % extension, config)
+
+
+def parse_value(value: str):
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    try:
+        return int(value)
+    except:
+        return value
 
 
 def lookup(root_dir: str) -> str:
@@ -250,7 +183,7 @@ def lookup(root_dir: str) -> str:
     parent = path.split(root_dir)[0]
     if parent == root_dir:
         debug("not found.")
-        return ""
+        return None
     file_path = path.join(parent, ".editorconfig")
     if path.exists(file_path):
         debug("using " + file_path)
@@ -266,29 +199,98 @@ def get_lines(file_name: str) -> list:
     for ln in open(file_name).readlines():
         line = re.split("[#;]", ln)[0].strip()
         if line:
-            verbose(line)
+            # verbose('  %s' % line)
             lines.append(line)
     return lines
 
 
-def matches(string: str, _pattern: str) -> bool:
+def matches(string: str, line: str) -> bool:
     """
     Check whether a string matches a pattern or not.
     """
-    for pattern in extract_patterns(_pattern):
+    for pattern in get_patterns(line):
         if pattern == "*" or pattern == string:
             return True
         elif pattern.endswith("*"):
             return string.startswith(pattern[:-1])
         elif pattern.startswith("*"):
             return string.endswith(pattern[1:])
+        else:
+            return string == pattern
     return False
 
 
-def extract_patterns(source: str) -> list:
+def get_patterns(source: str) -> list:
     if source == "*":
         return [source]
     elif "{" in source:
         return re.findall(r"\*\.{(\S+)}", source)[0].split(",")
     else:
         return [source[2:]]
+
+
+# -----------------------------------------------------------------------------
+
+
+def use_settings() -> dict:
+    global settings
+    if settings is not None:
+        return settings
+
+    # Load default settings
+    memory = load_settings("EditorConfig.sublime-settings")
+    settings = {}
+    for key, fallback in [
+        ("debug",   False),
+        ("verbose", False),
+        ("watch",   []),
+        ("on_load", []),
+        ("on_save", []),
+    ]:
+        value = memory.get(key)
+        # verbose("key: %s, value: %s" % (key, value))
+        settings[key] = fallback if value is None else value
+    verbose('Settings: ' % settings)
+    return settings
+
+
+def use_config() -> dict:
+    global config
+    if config is not None:
+        return config
+
+    raw = load_settings("Preferences.sublime-settings")
+    system = {
+        "default_encoding": raw.get("default_encoding").lower(),
+        "default_line_ending": get_default_line_ending(raw),
+        "tab_size": raw.get("tab_size"),
+        "translate_tabs_to_spaces": raw.get("translate_tabs_to_spaces"),
+        "ensure_newline_at_eof_on_save": raw.get("ensure_newline_at_eof_on_save"),
+        "trim_trailing_white_space_on_save": raw.get("trim_trailing_white_space_on_save"),
+    }
+    config = {
+        "charset": system.get("default_encoding"),
+        "end_of_line": system.get("default_line_ending"),
+        "indent_size": system.get("tab_size"),
+        "indent_style": "space" if system.get("translate_tabs_to_spaces") else "tab",
+        "insert_final_newline": system.get("ensure_newline_at_eof_on_save"),
+        "trim_trailing_whitespace": system.get("trim_trailing_white_space_on_save"),
+    }
+    return inspect('Config', config)
+
+
+def get_default_line_ending(raw: Settings) -> str:
+    from sublime import platform
+    ending = raw.get("default_line_ending").lower()
+    is_windows = ending == "system" and platform() == "windows"
+    is_windows = ending == "windows" or is_windows
+    return "crlf" if is_windows else "lf"
+
+
+def inspect(title: str, data: dict) -> dict:
+    if settings["verbose"]:
+        content = "%s: {\n" % title
+        for key, value in data.items():
+            content += "  %s: %s\n" % (key, value)
+        print("%s}" % content)
+    return data
