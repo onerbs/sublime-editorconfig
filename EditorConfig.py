@@ -60,17 +60,15 @@ def dispatch(view: View, event: str):
 class RemoveFinalNewlinesCommand(TextCommand):
     def run(self, edit):
         region = self.view.find(r"\n*\Z", 0)
-        if region.size() > 1:
-            self.view.erase(edit, region)
-            debug("Final newlines removed")
+        self.view.erase(edit, region)
+        debug("Final newlines removed")
 
 
 class NormalizeFinalNewlinesCommand(TextCommand):
     def run(self, edit):
         region = self.view.find(r"\n*\Z", 0)
-        if region.size() > 1:
-            self.view.replace(edit, region, "\n")
-            debug("Final newlines normalized")
+        self.view.replace(edit, region, "\n")
+        debug("Final newlines normalized")
 
 
 # -----------------------------------------------------------------------------
