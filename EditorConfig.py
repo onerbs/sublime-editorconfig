@@ -211,12 +211,10 @@ def matches(string: str, line: str) -> bool:
     for pattern in get_patterns(line):
         if pattern == "*" or pattern == string:
             return True
-        elif pattern.endswith("*"):
-            return string.startswith(pattern[:-1])
-        elif pattern.startswith("*"):
-            return string.endswith(pattern[1:])
-        else:
-            return string == pattern
+        elif pattern.endswith("*") and string.startswith(pattern[:-1]):
+            return True
+        elif pattern.startswith("*") and string.endswith(pattern[1:]):
+            return True
     return False
 
 
