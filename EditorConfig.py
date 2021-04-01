@@ -224,7 +224,7 @@ def get_patterns(source: str) -> list:
     if source == "*":
         return [source]
     elif "{" in source:
-        return re.findall(r"\*\.{(\S+)}", source)[0].split(",")
+        return source[3:-1].split(",")
     else:
         return [source[2:]]
 
