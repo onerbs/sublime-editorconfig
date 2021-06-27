@@ -27,7 +27,7 @@ contexts:
           scope: string.name.value.ini
         - include: Comment
         - include: EOL
-    - match: \S+
+    - match: '[^=]+'
       scope: variable.other.ini
 
   Comment:
